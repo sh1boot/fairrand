@@ -1,38 +1,45 @@
-#include <stdio.h>
+#include <stdlib.h>
+#include <limits.h>
 
-#define RAND_BITS 16
-#define N_BITS 16
+#define RAND_BITS 31
+#if (1u << RAND_BITS) - 1 != RAND_MAX
+#error RAND_BITS is wrong
+#endif
 
-#define QUALITY_BITS 64
+#define BIAS_BITS 64
 
-#define BUCKETS ((N_BITS + QUALITY_BITS + RAND_BITS - 1) / RAND_BITS)
+#define BUCKETS ((sizeof(int) * CHAR_BIT + BIAS_BITS + RAND_BITS - 1) / RAND_BITS)
 
-extern int bits_of(int n);
+static int bitcost(int n)
+{
+    return sizeof(int) * CHAR_BIT - __builtin_clz(n - 1) + 1;
+}
 
 int random_lt_n(int n)
 {
-	static int pool_entr = 0;
-	int pool[BUCKETS];
+	static int pool_bits = 0;
+	static int pool[BUCKETS];
 	int i = 0, o = 0;
 	int r = n / 2;
 
-	pool_entr -= bits_of(n);
-	while (pool_entr < QUALITY_BITS)
+	pool_bits -= bitcost(n);
+	while (pool_bits < BIAS_BITS)
 	{
 		i++;
-		pool_entr += RAND_BITS;
+		pool_bits += RAND_BITS;
 	}
+
 	while (i < BUCKETS)
 	{
-		long long tmp = (long long)pool[i++] * n + r;
-		pool[o++] = (int)tmp & ~(-1 << RAND_BITS);
-		r = (int)(tmp >> RAND_BITS);
+		long long t = (long long)pool[i++] * n + r;
+		pool[o++] = (int)t & ~(-1 << RAND_BITS);
+		r = (int)(t >> RAND_BITS);
 	}
 	while (o < BUCKETS)
 	{
-		long long tmp = (long long)rand() * n + r;
-		pool[o++] = (int)tmp & ~(-1 << RAND_BITS);
-		r = (int)(tmp >> RAND_BITS);
+		long long t = (long long)rand() * n + r;
+		pool[o++] = (int)t & ~(-1 << RAND_BITS);
+		r = (int)(t >> RAND_BITS);
 	}
 	return r;
 }
